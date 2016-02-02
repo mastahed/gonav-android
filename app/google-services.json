@@ -1,0 +1,44 @@
+{
+  "project_info": {
+    "project_id": "gonav-1206",
+    "project_number": "770804198182",
+    "name": "GoNav"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:770804198182:android:39e534d59be4baa9",
+        "client_id": "android:com.mastahed.gonav",
+        "client_type": 1,
+        "android_client_info": {
+          "package_name": "com.mastahed.gonav"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "cloud_messaging_service": {
+          "status": 1,
+          "apns_config": []
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "google_signin_service": {
+          "status": 1
+        },
+        "ads_service": {
+          "status": 2,
+          "test_banner_ad_unit_id": "ca-app-pub-3940256099942544/6300978111",
+          "test_interstitial_ad_unit_id": "ca-app-pub-3940256099942544/1033173712"
+        }
+      }
+    }
+  ],
+  "client_info": [],
+  "ARTIFACT_VERSION": "1"
+}
