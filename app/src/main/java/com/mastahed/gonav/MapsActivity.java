@@ -12,9 +12,12 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -71,14 +74,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .setInterval(10 * 1000)        // 10 seconds, in milliseconds
                 .setFastestInterval(1 * 1000); // 1 second, in milliseconds
 
-        ImageButton btnSearch = (ImageButton) findViewById(R.id.btnSearch);
         txtlocation = (EditText) findViewById(R.id.txtLocation);
 
-        btnSearch.setOnClickListener(new View.OnClickListener() {
-
+        txtlocation.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
-            public void onClick(View v) {
-                showLocation();
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                boolean handled = false;
+
+                if(actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    showLocation();
+                    handled = true;
+                }
+
+                return handled;
             }
         });
 
@@ -110,7 +118,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));
 
             } else {
-                tts.speak("I am sorry. I can't find " + location + ". Please try again.", TextToSpeech.QUEUE_FLUSH, null);
+                tts.speak("I'm sorry. I can't find " + location + ". Please try again.", TextToSpeech.QUEUE_FLUSH, null);
             }
         }
         else {
@@ -175,20 +183,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mMap.setMyLocationEnabled(true);
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 0) {
 
-            /*Location mCurrentLocation = mMap.getMyLocation();
-
-            // Add a marker in my current location and move the camera
-            LatLng curLoc = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
-            mMap.addMarker(new MarkerOptions().position(curLoc));
-            CameraUpdate cameraUpdate  = CameraUpdateFactory.newLatLngZoom(curLoc, 15);
-            mMap.moveCamera(cameraUpdate);*/
+            /*Location mCurrentLocation = mMap.getMyLocation();*/
 
             Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
 
             if (location == null) {
-                /*LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);*/
                 tts.speak("Cannot find your current location. Please check your settings.",TextToSpeech.QUEUE_FLUSH, null);
 
             } else {
@@ -196,12 +197,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 currentLatitude = location.getLatitude();
                 currentLongitude = location.getLongitude();
 
-                Toast.makeText(this, currentLatitude + " WORKS " + currentLongitude + "", Toast.LENGTH_LONG).show();
+                // Add a marker in my current location and move the camera
+                LatLng curLoc = new LatLng(currentLatitude, currentLongitude);
+                mMap.addMarker(new MarkerOptions().position(curLoc));
+                CameraUpdate cameraUpdate  = CameraUpdateFactory.newLatLngZoom(curLoc, 15);
+                mMap.moveCamera(cameraUpdate);
+
             }
-        }
-        else
-        {
-            Toast.makeText(MapsActivity.this, "NOT CONNECTED", Toast.LENGTH_LONG).show();
         }
     }
 

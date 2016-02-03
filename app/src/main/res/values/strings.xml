@@ -2,5 +2,5 @@
     <string name="app_name">GoNav</string>
     <string name="title_activity_maps">Map</string>
     <string name="searchBtn">Search</string>
-    <string name="google_app_id">gonav-1206</string>
+    <string name="search_hint">Search Location</string>
 </resources>

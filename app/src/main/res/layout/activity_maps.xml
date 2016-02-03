@@ -10,20 +10,13 @@
 
 
         <EditText
-            android:layout_width="wrap_content"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:id="@+id/txtLocation"
-            android:drawableRight="@drawable/"/>
-
-        <ImageButton
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/searchBtn"
-            android:id="@+id/btnSearch"
-            android:background="@drawable/places_ic_search"
-            android:drawableTop="@drawable/places_ic_search"
-            />
+            android:drawableLeft="@drawable/android_search_icon"
+            android:hint="@string/search_hint"
+            android:inputType="text"
+            android:imeOptions="actionSearch"/>
 
     </LinearLayout>
 
