@@ -1,32 +1,48 @@
-<LinearLayout
+<RelativeLayout
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical">
 
+    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:map="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/map"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:context="com.mastahed.gonav.MapsActivity" />
+
     <LinearLayout
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content">
-
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="25dp"
+        android:layout_marginEnd="30dp">
 
         <EditText
-            android:layout_width="fill_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:id="@+id/txtLocation"
-            android:drawableLeft="@drawable/android_search_icon"
             android:hint="@string/search_hint"
             android:inputType="text"
+            android:layout_gravity="center"
+            android:layout_weight="0.8"
+            android:background="@android:color/background_light"
+            android:padding="10dp"
+            android:singleLine="true"
             android:imeOptions="actionSearch"/>
+
+        <ImageButton
+            android:id="@+id/imgBtnMic"
+            android:layout_width="17dp"
+            android:layout_height="wrap_content"
+            android:background="@android:color/background_light"
+            android:padding="10dp"
+            android:paddingBottom="5dp"
+            android:layout_marginTop="0dp"
+            android:src="@drawable/android_mic_icon" />
 
     </LinearLayout>
 
-<fragment xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:map="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/map"
-    android:name="com.google.android.gms.maps.SupportMapFragment"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    tools:context="com.mastahed.gonav.MapsActivity" />
-
-</LinearLayout>
+</RelativeLayout>

@@ -2,11 +2,14 @@ package com.mastahed.gonav;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -17,6 +20,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,6 +33,7 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
@@ -36,6 +41,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.location.FusedLocationProviderApi;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -54,6 +60,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private EditText txtlocation;
     private double currentLatitude;
     private double currentLongitude;
+    private int REQUEST_CODE = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,8 +88,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 boolean handled = false;
 
-                if(actionId == EditorInfo.IME_ACTION_SEARCH) {
-                    showLocation();
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    String location = txtlocation.getText().toString();
+                    showLocation(location);
                     handled = true;
                 }
 
@@ -90,10 +98,54 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
+        ImageButton btnVoice = (ImageButton) findViewById(R.id.imgBtnMic);
+
+        btnVoice.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                promptSpeechInput();
+            }
+
+        });
     }
 
-    protected void showLocation() {
-        String location = txtlocation.getText().toString();
+    private void promptSpeechInput() {
+
+        String DIALOG_TEXT = "Search Location";
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, DIALOG_TEXT);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, REQUEST_CODE);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US");
+
+        try {
+            startActivityForResult(intent, REQUEST_CODE);
+        } catch (ActivityNotFoundException a) {
+            Toast.makeText(getApplicationContext(),
+                    "Not Supported",
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultcode, Intent intent) {
+        super.onActivityResult(requestCode, resultcode, intent);
+        ArrayList<String> speech;
+        if (resultcode == RESULT_OK) {
+            if (requestCode == REQUEST_CODE) {
+                speech = intent.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                showLocation(speech.get(0));
+                txtlocation.setText(speech.get(0));
+            }
+        }
+        else{
+            Toast.makeText(MapsActivity.this, "Unable to search. Please try again.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    protected void showLocation(String location) {
 
         if (!location.equals("")) {
             // Speak location
@@ -114,8 +166,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (addressList != null) {
                 address = addressList.get(0); // get the first result
                 LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
-                mMap.addMarker(new MarkerOptions().position(latLng).title("Current Location"));
-                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));
+                updateMapView(latLng);
+                /*mMap.addMarker(new MarkerOptions().position(latLng).title("Current Location"));
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));*/
 
             } else {
                 tts.speak("I'm sorry. I can't find " + location + ". Please try again.", TextToSpeech.QUEUE_FLUSH, null);
@@ -131,6 +184,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
         mMap.getUiSettings().setMyLocationButtonEnabled(true);
         mMap.getUiSettings().setZoomControlsEnabled(true);
+
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().
+                findFragmentById(R.id.map);
+        View mapView = mapFragment.getView();
+        if (mapView != null &&
+                mapView.findViewById(1) != null) {
+            // Get the button view
+            View locationButton = ((View) mapView.findViewById(1).getParent()).findViewById(2);
+            // and next place it, on bottom right (as Google Maps app)
+            RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams)
+                    locationButton.getLayoutParams();
+            // position on right bottom
+            layoutParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT, 0);
+            layoutParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, RelativeLayout.TRUE);
+            layoutParams.setMargins(30, 30, 0, 0);
+        }
     }
 
     /**
@@ -185,8 +254,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 0) {
 
-            /*Location mCurrentLocation = mMap.getMyLocation();*/
-
             Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
 
             if (location == null) {
@@ -199,12 +266,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                 // Add a marker in my current location and move the camera
                 LatLng curLoc = new LatLng(currentLatitude, currentLongitude);
-                mMap.addMarker(new MarkerOptions().position(curLoc));
-                CameraUpdate cameraUpdate  = CameraUpdateFactory.newLatLngZoom(curLoc, 15);
-                mMap.moveCamera(cameraUpdate);
+                updateMapView(curLoc);
 
             }
         }
+    }
+
+    private void updateMapView(LatLng loc) {
+        mMap.addMarker(new MarkerOptions().position(loc));
+        CameraUpdate cameraUpdate  = CameraUpdateFactory.newLatLngZoom(loc, 15);
+        mMap.moveCamera(cameraUpdate);
     }
 
     @Override
@@ -253,7 +324,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         currentLatitude = location.getLatitude();
         currentLongitude = location.getLongitude();
 
-        Toast.makeText(this, currentLatitude + " WORKS " + currentLongitude + "", Toast.LENGTH_LONG).show();
+
     }
 
     @Override
