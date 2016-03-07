@@ -63,6 +63,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -180,8 +181,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 txtlocation.setText(speech.get(0));
                 showLocation(speech.get(0));
             }
-        }
-        else {
+        } else {
             Toast.makeText(MapsActivity.this, "Unable to search. Please try again.", Toast.LENGTH_SHORT).show();
             tts.speak("Unable to search. Please try again.", TextToSpeech.QUEUE_FLUSH, null);
             promptSpeechInput();
@@ -212,8 +212,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 address = addressList.get(0); // get the first result
                 LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
                 updateMapView(latLng);
-                /*mMap.addMarker(new MarkerOptions().position(latLng).title("Current Location"));
-                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));*/
+
+
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 0) {
+                    Location curloc  = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+                    LatLng curLatlng = new LatLng(curloc.getLatitude(), curloc.getLongitude());
+
+                    Double distance = CalculationByDistance(curLatlng, latLng);
+                    String diststr = String.valueOf(distance);
+
+                    tts.speak("Your distance from " + location + " is " + diststr + " kilometers.", TextToSpeech.QUEUE_ADD, null);
+
+                    Toast.makeText(MapsActivity.this, "Distance (km): " + diststr, Toast.LENGTH_SHORT).show();
+                }
 
             } else {
                 tts.speak("I'm sorry. I can't find " + location + ". Please try again.", TextToSpeech.QUEUE_FLUSH, null);
@@ -530,5 +541,31 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
         }
+    }
+
+    public double CalculationByDistance(LatLng StartP, LatLng EndP) {
+        int Radius = 6371;// radius of earth in Km
+        double lat1 = StartP.latitude;
+        double lat2 = EndP.latitude;
+        double lon1 = StartP.longitude;
+        double lon2 = EndP.longitude;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1))
+                * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2)
+                * Math.sin(dLon / 2);
+        double c = 2 * Math.asin(Math.sqrt(a));
+        double valueResult = Radius * c;
+        double km = valueResult / 1;
+        DecimalFormat newFormat = new DecimalFormat("####");
+        int kmInDec = Integer.valueOf(newFormat.format(km));
+        double meter = valueResult % 1000;
+        int meterInDec = Integer.valueOf(newFormat.format(meter));
+        Log.i("Radius Value", "" + valueResult + "   KM  " + kmInDec
+                + " Meter   " + meterInDec);
+
+        //return Radius * c;
+        return kmInDec;
     }
 }
