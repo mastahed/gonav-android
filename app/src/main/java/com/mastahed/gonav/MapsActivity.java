@@ -2,6 +2,7 @@ package com.mastahed.gonav;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.IntentSender;
@@ -9,11 +10,13 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.text.Html;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -24,23 +27,42 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.StatusLine;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.location.FusedLocationProviderApi;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -61,6 +83,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private double currentLatitude;
     private double currentLongitude;
     private int REQUEST_CODE = 1;
+
+    private int userIcon, foodIcon, drinkIcon, shopIcon, otherIcon;
+    private Marker[] placeMarkers;
+    private final int MAX_PLACES = 20;
+    private MarkerOptions[] places;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,6 +136,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
 
         });
+
+        userIcon = R.drawable.yellow_point;
+        foodIcon = R.drawable.red_point;
+        drinkIcon = R.drawable.blue_point;
+        shopIcon = R.drawable.green_point;
+        otherIcon = R.drawable.purple_point;
+
+        // Show nearby places
+        showNearbyPlaces();
+
     }
 
     private void promptSpeechInput() {
@@ -136,13 +174,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (resultcode == RESULT_OK) {
             if (requestCode == REQUEST_CODE) {
                 speech = intent.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-                showLocation(speech.get(0));
+
+                //tts.speak("You searched for " + speech.get(0) + ". Is this correct?", TextToSpeech.QUEUE_FLUSH, null);
+
                 txtlocation.setText(speech.get(0));
+                showLocation(speech.get(0));
             }
         }
-        else{
+        else {
             Toast.makeText(MapsActivity.this, "Unable to search. Please try again.", Toast.LENGTH_SHORT).show();
+            tts.speak("Unable to search. Please try again.", TextToSpeech.QUEUE_FLUSH, null);
+            promptSpeechInput();
         }
+
     }
 
     protected void showLocation(String location) {
@@ -155,6 +199,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             List<Address> addressList = null;
 
             try {
+                // Populate nearby addresses
                 addressList = geocoder.getFromLocationName(location, 1); // select only one result
 
             } catch (IOException e) {
@@ -268,6 +313,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 LatLng curLoc = new LatLng(currentLatitude, currentLongitude);
                 updateMapView(curLoc);
 
+                String placesSearchStr = "https://maps.googleapis.com/maps/api/place/nearbysearch/" +
+                "json?location="+currentLatitude+","+currentLongitude+
+                "&radius=1000&sensor=true" +
+                "&types=food|bar|store|museum|art_gallery"+
+                "&key=AIzaSyCRWUk39tRxjBzEWGQAUosGCdpY9hsJRgM";
+
+                new GetPlaces().execute(placesSearchStr);
+
             }
         }
     }
@@ -340,6 +393,142 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         } else {
             Log.e("TTS", "Initilization Failed!");
+        }
+    }
+
+    private void showNearbyPlaces() {
+        placeMarkers = new Marker[MAX_PLACES];
+
+        if(placeMarkers!=null){
+            for(int pm=0; pm<placeMarkers.length; pm++){
+                if(placeMarkers[pm]!=null)
+                    placeMarkers[pm].remove();
+            }
+        }
+    }
+
+    private class GetPlaces extends AsyncTask<String, Void, String> {
+        //fetch and parse place data
+        @Override
+        protected String doInBackground(String... placesURL) {
+            StringBuilder placesBuilder = new StringBuilder();
+
+            //process search parameter string(s)
+            for (String placeSearchURL : placesURL) {
+                //execute search
+                HttpClient placesClient = new DefaultHttpClient();
+
+                try {
+                    //try to fetch the data
+                    HttpGet placesGet = new HttpGet(placeSearchURL);
+                    HttpResponse placesResponse = placesClient.execute(placesGet);
+                    StatusLine placeSearchStatus = placesResponse.getStatusLine();
+
+                    if (placeSearchStatus.getStatusCode() == 200) {
+                        //we have an OK response
+                        HttpEntity placesEntity = placesResponse.getEntity();
+                        InputStream placesContent = placesEntity.getContent();
+                        InputStreamReader placesInput = new InputStreamReader(placesContent);
+                        BufferedReader placesReader = new BufferedReader(placesInput);
+
+                        String lineIn;
+                        while ((lineIn = placesReader.readLine()) != null) {
+                            placesBuilder.append(lineIn);
+                        }
+                    }
+                }
+                catch(Exception e){
+                    e.printStackTrace();
+                }
+            }
+
+            return placesBuilder.toString();
+        }
+
+        @Override
+        public void onPostExecute(String result) {
+            //parse place data returned from Google Places
+            if(placeMarkers!=null){
+                for(int pm=0; pm<placeMarkers.length; pm++){
+                    if(placeMarkers[pm]!=null)
+                        placeMarkers[pm].remove();
+                }
+            }
+
+            try {
+                //parse JSON
+                JSONObject resultObject = new JSONObject(result);
+                JSONArray placesArray = resultObject.getJSONArray("results");
+                places = new MarkerOptions[placesArray.length()];
+
+                boolean missingValue=false;
+                LatLng placeLL=null;
+                String placeName="";
+                String vicinity="";
+                int currIcon = otherIcon;
+
+                //loop through places
+                for (int p=0; p<placesArray.length(); p++) {
+                    //parse each place
+                    try{
+                        //attempt to retrieve place data values
+                        missingValue=false;
+
+                        JSONObject placeObject = placesArray.getJSONObject(p);
+
+                        JSONObject loc = placeObject.getJSONObject("geometry").getJSONObject("location");
+
+                        placeLL = new LatLng(
+                                Double.valueOf(loc.getString("lat")),
+                                Double.valueOf(loc.getString("lng")));
+
+                        JSONArray types = placeObject.getJSONArray("types");
+
+                        for(int t=0; t<types.length(); t++){
+                            String thisType=types.get(t).toString();
+
+                            if(thisType.contains("food")){
+                                currIcon = foodIcon;
+                                break;
+                            }
+                            else if(thisType.contains("bar")){
+                                currIcon = drinkIcon;
+                                break;
+                            }
+                            else if(thisType.contains("store")){
+                                currIcon = shopIcon;
+                                break;
+                            }
+                        }
+
+                        vicinity = placeObject.getString("vicinity");
+                        placeName = placeObject.getString("name");
+                    }
+                    catch(JSONException jse){
+                        missingValue=true;
+                        jse.printStackTrace();
+                    }
+
+                    if(missingValue)    places[p]=null;
+                    else
+                        places[p]=new MarkerOptions()
+                                .position(placeLL)
+                                .title(placeName)
+                                .icon(BitmapDescriptorFactory.fromResource(currIcon))
+                                .snippet(vicinity);
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if(places!=null && placeMarkers!=null){
+                for(int p=0; p<places.length && p<placeMarkers.length; p++){
+                    //will be null if a value was missing
+                    if(places[p]!=null)
+                        placeMarkers[p]=mMap.addMarker(places[p]);
+                }
+            }
         }
     }
 }
