@@ -46,6 +46,7 @@ import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -55,6 +56,7 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.location.FusedLocationProviderApi;
@@ -83,12 +85,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private EditText txtlocation;
     private double currentLatitude;
     private double currentLongitude;
-    private int REQUEST_CODE = 1;
+    private int REQUEST_CODE = 0;
+    int PLACE_PICKER_REQUEST = 1;
 
     private int userIcon, foodIcon, drinkIcon, shopIcon, otherIcon;
     private Marker[] placeMarkers;
     private final int MAX_PLACES = 20;
     private MarkerOptions[] places;
+    PlacePicker.IntentBuilder intentBuilder = new PlacePicker.IntentBuilder();
 
 
     @Override
@@ -144,9 +148,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         shopIcon = R.drawable.green_point;
         otherIcon = R.drawable.purple_point;
 
-        // Show nearby places
-        showNearbyPlaces();
-
     }
 
     private void promptSpeechInput() {
@@ -172,20 +173,38 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onActivityResult(int requestCode, int resultcode, Intent intent) {
         super.onActivityResult(requestCode, resultcode, intent);
         ArrayList<String> speech;
+
         if (resultcode == RESULT_OK) {
-            if (requestCode == REQUEST_CODE) {
-                speech = intent.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
 
-                //tts.speak("You searched for " + speech.get(0) + ". Is this correct?", TextToSpeech.QUEUE_FLUSH, null);
+            switch(requestCode) {
+                case 0:
+                    speech = intent.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
 
-                txtlocation.setText(speech.get(0));
-                showLocation(speech.get(0));
+                    txtlocation.setText(speech.get(0));
+                    showLocation(speech.get(0));
+
+                    break;
+                case 1:
+                    // The user has selected a place. Extract the name and address.
+                    final Place place = PlacePicker.getPlace(this, intent);
+
+                    final CharSequence name = place.getName();
+                    final CharSequence address = place.getAddress();
+                    final LatLng latlng = place.getLatLng();
+
+                    //showLocationByLatLng(String.valueOf(name), latlng);
+                    updateMapView(latlng);
+
+                    finishActivity(PLACE_PICKER_REQUEST);
+
+                    break;
             }
-        } else {
-            Toast.makeText(MapsActivity.this, "Unable to search. Please try again.", Toast.LENGTH_SHORT).show();
-            tts.speak("Unable to search. Please try again.", TextToSpeech.QUEUE_FLUSH, null);
-            promptSpeechInput();
+
         }
+        /*else {
+            Toast.makeText(MapsActivity.this, "Unable to search. Please try again.", Toast.LENGTH_SHORT).show();
+            tts.speak("Unable to search. Please try again.", TextToSpeech.QUEUE_ADD, null);
+        }*/
 
     }
 
@@ -211,29 +230,48 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (addressList != null) {
                 address = addressList.get(0); // get the first result
                 LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
-                updateMapView(latLng);
 
-
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 0) {
-                    Location curloc  = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-                    LatLng curLatlng = new LatLng(curloc.getLatitude(), curloc.getLongitude());
-
-                    Double distance = CalculationByDistance(curLatlng, latLng);
-                    String diststr = String.valueOf(distance);
-
-                    tts.speak("Your distance from " + location + " is " + diststr + " kilometers.", TextToSpeech.QUEUE_ADD, null);
-
-                    Toast.makeText(MapsActivity.this, "Distance (km): " + diststr, Toast.LENGTH_SHORT).show();
-                }
+                showLocationByLatLng(location, latLng);
 
             } else {
-                tts.speak("I'm sorry. I can't find " + location + ". Please try again.", TextToSpeech.QUEUE_FLUSH, null);
+                tts.speak("I'm sorry. I can't find " + location + ". Please try again.", TextToSpeech.QUEUE_ADD, null);
             }
         }
         else {
             tts.speak("Please enter your desired location.", TextToSpeech.QUEUE_FLUSH, null);
         }
+
     }
+
+    private void showLocationByLatLng(String location, LatLng latLng) {
+        // current location
+        LatLng curLatlng = null;
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 0)
+        {
+            Location curloc  = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+            curLatlng = new LatLng(curloc.getLatitude(), curloc.getLongitude());
+        }
+
+        if (curLatlng != null) {
+            showNearbyPlaces(new LatLngBounds(latLng, curLatlng));
+        }
+
+        updateMapView(latLng);
+
+        showDistance(location, curLatlng, latLng);
+
+    }
+
+    private void showDistance(String location, LatLng startLatLng, LatLng endLatLng) {
+        Double distance = CalculationByDistance(startLatLng, endLatLng);
+        String diststr = String.valueOf(distance);
+
+        tts.speak("Your distance from " + location + " is " + diststr + " kilometers.", TextToSpeech.QUEUE_ADD, null);
+
+        Toast.makeText(MapsActivity.this, "Distance (km): " + diststr, Toast.LENGTH_SHORT).show();
+    }
+
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -244,6 +282,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().
                 findFragmentById(R.id.map);
         View mapView = mapFragment.getView();
+
         if (mapView != null &&
                 mapView.findViewById(1) != null) {
             // Get the button view
@@ -261,13 +300,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     /**
      * Creating google api client object
      * */
-    protected synchronized void buildGoogleApiClient() {
+    protected synchronized void buildGoogleApiClient()
+    {
         // Create an instance of GoogleAPIClient.
         if (mGoogleApiClient == null) {
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
+            mGoogleApiClient = new GoogleApiClient
+                    .Builder(this)
+                    .enableAutoManage(this, 0, this)
                     .addConnectionCallbacks(this)
                     .addOnConnectionFailedListener(this)
                     .addApi(LocationServices.API)
+                    .addApi(Places.GEO_DATA_API)
+                    .addApi(Places.PLACE_DETECTION_API)
                     .build();
         }
     }
@@ -324,22 +368,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 LatLng curLoc = new LatLng(currentLatitude, currentLongitude);
                 updateMapView(curLoc);
 
-                String placesSearchStr = "https://maps.googleapis.com/maps/api/place/nearbysearch/" +
-                "json?location="+currentLatitude+","+currentLongitude+
-                "&radius=1000&sensor=true" +
-                "&types=food|bar|store|museum|art_gallery"+
-                "&key=AIzaSyCRWUk39tRxjBzEWGQAUosGCdpY9hsJRgM";
-
-                new GetPlaces().execute(placesSearchStr);
-
+                //showNearbyPlaces(new LatLngBounds(curLoc, curLoc));
             }
         }
     }
 
     private void updateMapView(LatLng loc) {
         mMap.addMarker(new MarkerOptions().position(loc));
-        CameraUpdate cameraUpdate  = CameraUpdateFactory.newLatLngZoom(loc, 15);
-        mMap.moveCamera(cameraUpdate);
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(loc));
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
     }
 
     @Override
@@ -387,8 +424,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onLocationChanged(Location location) {
         currentLatitude = location.getLatitude();
         currentLongitude = location.getLongitude();
-
-
     }
 
     @Override
@@ -407,22 +442,29 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    private void showNearbyPlaces() {
-        placeMarkers = new Marker[MAX_PLACES];
+    private void showNearbyPlaces(LatLngBounds latLngBounds) {
+        intentBuilder.setLatLngBounds(latLngBounds);
+        Intent intent = null;
 
-        if(placeMarkers!=null){
-            for(int pm=0; pm<placeMarkers.length; pm++){
-                if(placeMarkers[pm]!=null)
-                    placeMarkers[pm].remove();
-            }
+        try {
+            intent = intentBuilder.build(MapsActivity.this);
+        } catch (GooglePlayServicesRepairableException e) {
+            e.printStackTrace();
+        } catch (GooglePlayServicesNotAvailableException e) {
+            e.printStackTrace();
         }
+        startActivityForResult(intent, PLACE_PICKER_REQUEST);
+
     }
 
     private class GetPlaces extends AsyncTask<String, Void, String> {
+
         //fetch and parse place data
         @Override
         protected String doInBackground(String... placesURL) {
             StringBuilder placesBuilder = new StringBuilder();
+
+            Log.i("Places URL", String.valueOf(placesURL));
 
             //process search parameter string(s)
             for (String placeSearchURL : placesURL) {
@@ -470,6 +512,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 //parse JSON
                 JSONObject resultObject = new JSONObject(result);
                 JSONArray placesArray = resultObject.getJSONArray("results");
+
+                Log.i("Places Array", String.valueOf(placesArray));
+
                 places = new MarkerOptions[placesArray.length()];
 
                 boolean missingValue=false;
@@ -498,7 +543,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         for(int t=0; t<types.length(); t++){
                             String thisType=types.get(t).toString();
 
-                            if(thisType.contains("food")){
+                            if(thisType.contains("restaurant")){
                                 currIcon = foodIcon;
                                 break;
                             }
