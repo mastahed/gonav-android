@@ -181,8 +181,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 case 0:
                     speech = intent.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
 
-                    txtlocation.setText(speech.get(0));
-                    showLocation(speech.get(0));
+                    if(speech.get(0) != null)
+                    {
+                        txtlocation.setText(speech.get(0));
+                        showLocation(speech.get(0));
+                    }
+                    else
+                    {
+                        Toast.makeText(MapsActivity.this, String.valueOf(speech.get(0)), Toast.LENGTH_SHORT).show();
+                        tts.speak("Unable to search. Please try again.", TextToSpeech.QUEUE_ADD, null);
+                    }
 
                     break;
                 case 1:
@@ -230,7 +238,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             try {
                 // Populate nearby addresses
-                addressList = geocoder.getFromLocationName(location, 1); // select only one result
+                addressList = geocoder.getFromLocationName(location + "negros oriental", 1); // select only one result
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -239,13 +247,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Address address;
 
             if (addressList != null) {
-                address = addressList.get(0); // get the first result
-                LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
 
-                showLocationByLatLng(location, latLng);
+                try {
+                    address = addressList.get(0); // get the first result
+
+                    LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
+
+                    updateMapView(latLng);
+
+                    showLocationByLatLng(location, latLng);
+
+                } catch (Exception e) {
+                    tts.speak("I'm sorry. I can't find " + location + ". I can only search places within Negros Oriental. Please try again.", TextToSpeech.QUEUE_ADD, null);
+                }
 
             } else {
-                tts.speak("I'm sorry. I can't find " + location + ". Please try again.", TextToSpeech.QUEUE_ADD, null);
+                tts.speak("I'm sorry. I can't find " + location + ". I can only search places within Negros Oriental. Please try again.", TextToSpeech.QUEUE_ADD, null);
             }
         }
         else {
@@ -260,9 +277,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Location curloc  = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
             LatLng curLatlng = new LatLng(curloc.getLatitude(), curloc.getLongitude());
 
-            showNearbyPlaces(new LatLngBounds(latLng, curLatlng));
-
-            updateMapView(latLng);
+            showNearbyPlaces(new LatLngBounds(latLng, latLng));
 
             showDistance(location, curLatlng, latLng);
         }
@@ -380,7 +395,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void updateMapView(LatLng loc) {
         mMap.addMarker(new MarkerOptions().position(loc));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(loc));
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(13));
     }
 
     @Override
@@ -457,6 +472,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } catch (GooglePlayServicesNotAvailableException e) {
             e.printStackTrace();
         }
+
         startActivityForResult(intent, PLACE_PICKER_REQUEST);
 
     }

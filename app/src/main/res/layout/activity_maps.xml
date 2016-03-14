@@ -18,7 +18,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:layout_marginStart="25dp"
-        android:layout_marginEnd="30dp">
+        android:layout_marginEnd="30dp"
+        android:id="@+id/linearLayout">
 
         <EditText
             android:layout_width="0dp"
@@ -44,5 +45,14 @@
             android:src="@drawable/android_mic_icon" />
 
     </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:text="Copyright 2016. All Rights Reserved. GoNav"
+        android:id="@+id/textView3"
+        android:layout_alignParentBottom="true"
+        android:layout_alignStart="@+id/linearLayout" />
 
 </RelativeLayout>

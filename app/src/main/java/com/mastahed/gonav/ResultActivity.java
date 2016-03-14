@@ -33,7 +33,6 @@ public class ResultActivity extends AppCompatActivity {
         TextView phoneTv = (TextView) findViewById(R.id.tvPhoneVal);
         TextView siteTv = (TextView) findViewById(R.id.tvSiteVal);
 
-
         setTitle(name);
         nameTv.setText(name);
         addrTv.setText(address);
