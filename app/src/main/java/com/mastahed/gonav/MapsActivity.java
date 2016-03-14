@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
@@ -190,12 +191,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                     final CharSequence name = place.getName();
                     final CharSequence address = place.getAddress();
+                    final CharSequence phone = place.getPhoneNumber();
+                    final Uri site = place.getWebsiteUri();
                     final LatLng latlng = place.getLatLng();
 
-                    //showLocationByLatLng(String.valueOf(name), latlng);
-                    updateMapView(latlng);
+                    Intent resultIntent = new Intent(this, ResultActivity.class);
+                    resultIntent.putExtra("name", name);
+                    resultIntent.putExtra("address", address);
+                    resultIntent.putExtra("phone", phone);
+                    resultIntent.putExtra("site", site);
+                    resultIntent.putExtra("latlng", latlng);
+                    startActivity(resultIntent);
 
-                    finishActivity(PLACE_PICKER_REQUEST);
+                    //showLocationByLatLng(String.valueOf(name), latlng);
+                    //updateMapView(latlng);
+
+                    //finishActivity(PLACE_PICKER_REQUEST);
 
                     break;
             }
@@ -240,27 +251,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         else {
             tts.speak("Please enter your desired location.", TextToSpeech.QUEUE_FLUSH, null);
         }
-
     }
 
     private void showLocationByLatLng(String location, LatLng latLng) {
         // current location
-        LatLng curLatlng = null;
-
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 0)
         {
             Location curloc  = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-            curLatlng = new LatLng(curloc.getLatitude(), curloc.getLongitude());
-        }
+            LatLng curLatlng = new LatLng(curloc.getLatitude(), curloc.getLongitude());
 
-        if (curLatlng != null) {
             showNearbyPlaces(new LatLngBounds(latLng, curLatlng));
+
+            updateMapView(latLng);
+
+            showDistance(location, curLatlng, latLng);
         }
-
-        updateMapView(latLng);
-
-        showDistance(location, curLatlng, latLng);
-
     }
 
     private void showDistance(String location, LatLng startLatLng, LatLng endLatLng) {
@@ -300,8 +305,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     /**
      * Creating google api client object
      * */
-    protected synchronized void buildGoogleApiClient()
-    {
+    protected synchronized void buildGoogleApiClient() {
         // Create an instance of GoogleAPIClient.
         if (mGoogleApiClient == null) {
             mGoogleApiClient = new GoogleApiClient
